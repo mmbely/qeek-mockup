@@ -64,13 +64,18 @@ const App: React.FC = () => {
         assistantText = "I've created a new mockup for you.";
       } else {
         nextXml = applyPatch(mockup.xml, result.data as any[]);
-        assistantText = "I've updated the mockup with your changes.";
+        assistantText =
+          nextXml !== mockup.xml
+            ? "I've updated the mockup with your changes."
+            : "I couldn't apply that update to the current mockup. Try naming a specific section or card title to edit.";
       }
 
-      setMockup(prev => ({
-        xml: nextXml,
-        history: [...prev.history, nextXml]
-      }));
+      if (nextXml !== mockup.xml) {
+        setMockup(prev => ({
+          xml: nextXml,
+          history: [...prev.history, nextXml]
+        }));
+      }
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),

@@ -18,3 +18,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/159dDI06ZNg2Jy2hAQBXmKy
 2. Set `VITE_ANTHROPIC_API_KEY` in `.env.local` to your Anthropic API key
 3. Run the app:
    `npm run dev`
+
+## Reference
+
+- https://chatgpt.com/c/699991c0-76e0-8384-80d4-bab2f3f80644

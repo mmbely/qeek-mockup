@@ -4,6 +4,72 @@ import { TEMPLATES, PREDEFINED_ELEMENTS, type TemplateId } from "../lib/template
 import { getFullTemplateMockupML, FILL_IN_ONLY_INSTRUCTION } from "../lib/full-templates.ts";
 
 const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
+const PATCH_OP_TYPES = new Set<PatchOp["type"]>(["replace", "insertAfter", "insertBefore", "delete"]);
+
+function extractPatchOps(patchBody: string): PatchOp[] {
+  const parser = new DOMParser();
+  const serializer = new XMLSerializer();
+  const wrapped = `<root>${patchBody}</root>`;
+  const doc = parser.parseFromString(wrapped, "application/xml");
+  const parseError = doc.querySelector("parsererror");
+
+  if (parseError) {
+    const patchTags = patchBody.match(/<patch\b[\s\S]*?<\/patch>/g) || [];
+    const opTags = patchBody.match(/<op\b[\s\S]*?\/>|<op\b[\s\S]*?<\/op>/g) || [];
+    const candidates = patchTags.length ? patchTags : opTags;
+
+    return candidates
+      .map((fragment) => {
+        const opType = (fragment.match(/type\s*=\s*["']([^"']+)["']/) || [])[1] as PatchOp["type"];
+        const target = (fragment.match(/target\s*=\s*["']([^"']+)["']/) || [])[1];
+        const valueMatch = fragment.match(/<value>([\s\S]*?)<\/value>/);
+        const value = valueMatch ? valueMatch[1].trim() : undefined;
+        if (!PATCH_OP_TYPES.has(opType) || !target) return null;
+        return { type: opType, target, value };
+      })
+      .filter((op): op is PatchOp => Boolean(op));
+  }
+
+  const opsFromPatch = Array.from(doc.querySelectorAll("patch"))
+    .map((patchEl) => {
+      const opEl = patchEl.querySelector("op");
+      const opType = ((opEl?.getAttribute("type") || patchEl.getAttribute("type")) as PatchOp["type"] | null);
+      const target = opEl?.getAttribute("target") || patchEl.getAttribute("target");
+      if (!opType || !PATCH_OP_TYPES.has(opType) || !target) return null;
+
+      const valueEl = patchEl.querySelector("value");
+      let value: string | undefined;
+      if (valueEl) {
+        value = Array.from(valueEl.childNodes).map((n) => serializer.serializeToString(n)).join("").trim();
+        if (!value) {
+          const textValue = valueEl.textContent?.trim();
+          if (textValue) value = textValue;
+        }
+      }
+
+      return { type: opType, target, value };
+    })
+    .filter((op): op is PatchOp => Boolean(op));
+
+  const standaloneOps = Array.from(doc.querySelectorAll("op"))
+    .filter((opEl) => opEl.parentElement?.tagName.toLowerCase() !== "patch")
+    .map((opEl) => {
+      const opType = opEl.getAttribute("type") as PatchOp["type"] | null;
+      const target = opEl.getAttribute("target");
+      if (!opType || !PATCH_OP_TYPES.has(opType) || !target) return null;
+
+      let value: string | undefined;
+      const siblingValue = opEl.nextElementSibling;
+      if (siblingValue && siblingValue.tagName.toLowerCase() === "value") {
+        value = Array.from(siblingValue.childNodes).map((n) => serializer.serializeToString(n)).join("").trim() || undefined;
+      }
+
+      return { type: opType, target, value };
+    })
+    .filter((op): op is PatchOp => Boolean(op));
+
+  return [...opsFromPatch, ...standaloneOps];
+}
 
 function buildSystemPrompt(preferredTemplateId?: TemplateId): string {
   const templateList = TEMPLATES.map((t) => `- ${t.id}: ${t.promptHint}`).join("\n");
@@ -71,21 +137,15 @@ export async function callMockupAI(
       .map((b) => b.text)
       .join("") || "";
 
-  const createMatch = text.match(/<response action="create">([\s\S]*?)<\/response>/);
+  const createMatch = text.match(/<response\s+action=["']create["']>([\s\S]*?)<\/response>/);
   if (createMatch) {
     return { type: "create", data: createMatch[1].trim() };
   }
 
-  const patchMatch = text.match(/<response action="patch">([\s\S]*?)<\/response>/);
+  const patchMatch = text.match(/<response\s+action=["']patch["']>([\s\S]*?)<\/response>/);
   if (patchMatch) {
-    const patchTags = patchMatch[1].match(/<patch>[\s\S]*?<\/patch>/g) || [];
-    const ops: PatchOp[] = patchTags.map((p) => {
-      const opType = (p.match(/type="([^"]+)"/) || [])[1] as PatchOp["type"];
-      const target = (p.match(/target="([^"]+)"/) || [])[1];
-      const valueMatch = p.match(/<value>([\s\S]*?)<\/value>/);
-      const value = valueMatch ? valueMatch[1].trim() : undefined;
-      return { type: opType, target, value };
-    });
+    const ops = extractPatchOps(patchMatch[1]);
+    if (ops.length === 0) return { type: "patch", data: [] };
     return { type: "patch", data: ops };
   }
 

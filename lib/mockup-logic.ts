@@ -75,13 +75,22 @@ function elementToAST(el: Element): ASTNode {
  * Applies a list of patch operations to the current XML.
  */
 export function applyPatch(currentXml: string, patches: PatchOp[]): string {
-  if (!currentXml) return '';
+  if (!currentXml || !Array.isArray(patches) || patches.length === 0) return currentXml || '';
   const parser = new DOMParser();
-  const doc = parser.parseFromString(currentXml, 'application/xml');
+  const doc = parser.parseFromString(escapeXmlAmpersands(currentXml), 'application/xml');
+  const docParseError = doc.querySelector('parsererror');
+  if (docParseError) {
+    console.error('Current XML parse error while applying patch:', docParseError.textContent);
+    return currentXml;
+  }
   const serializer = new XMLSerializer();
 
   patches.forEach(patch => {
     try {
+      if (!patch?.target) {
+        console.warn('Skipping patch with empty target.');
+        return;
+      }
       const targetEl = doc.querySelector(patch.target);
       if (!targetEl) {
         console.warn(`Patch target not found: ${patch.target}`);
@@ -96,7 +105,12 @@ export function applyPatch(currentXml: string, patches: PatchOp[]): string {
       if (patch.value === undefined) return;
 
       // Parse the value fragment
-      const fragmentDoc = parser.parseFromString(`<dummy>${patch.value}</dummy>`, 'application/xml');
+      const fragmentDoc = parser.parseFromString(`<dummy>${escapeXmlAmpersands(patch.value)}</dummy>`, 'application/xml');
+      const fragmentParseError = fragmentDoc.querySelector('parsererror');
+      if (fragmentParseError) {
+        console.warn('Skipping patch with invalid XML value:', fragmentParseError.textContent);
+        return;
+      }
       const fragmentNodes = Array.from(fragmentDoc.documentElement.childNodes);
 
       switch (patch.type) {
