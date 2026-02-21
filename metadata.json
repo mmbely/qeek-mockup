@@ -1,0 +1,5 @@
+{
+  "name": "MockupML AI Prototype",
+  "description": "An AI-powered wireframing tool that renders live UI mockups from a custom XML-like DSL (MockupML) using Anthropic for intelligent generation and patching.",
+  "requestFramePermissions": []
+}

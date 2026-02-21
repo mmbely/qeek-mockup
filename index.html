@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MockupML AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      /* Force mobile layout when device view is mobile (viewport-independent) */
+      [data-view="mobile"] {
+        flex-direction: column !important;
+        max-width: 375px !important;
+      }
+      [data-view="mobile"] aside {
+        display: none !important;
+      }
+      [data-view="mobile"] [class*="lg:flex"][class*="hidden"] {
+        display: none !important;
+      }
+      [data-view="mobile"] .lg\:hidden {
+        display: flex !important;
+      }
+      [data-view="mobile"] [class*="lg:w-64"],
+      [data-view="mobile"] [class*="lg:w-80"] {
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+      [data-view="mobile"] .lg\:flex-row,
+      [data-view="mobile"] [class*="lg:flex-row"] {
+        flex-direction: column !important;
+      }
+      [data-view="mobile"] [class*="lg:col-span"] {
+        grid-column: 1 / -1 !important;
+      }
+      [data-view="mobile"] [class*="lg:grid-cols"] {
+        grid-template-columns: 1fr !important;
+      }
+      /* Force tablet layout */
+      [data-view="tablet"] {
+        max-width: 768px !important;
+      }
+    </style>
+  </head>
+  <body class="bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
+    <div id="root">
+      <div class="flex flex-col items-center justify-center h-screen space-y-4">
+        <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        <div class="text-slate-400 font-medium tracking-widest uppercase text-xs">Initializing MockupML...</div>
+      </div>
+    </div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
